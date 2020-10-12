@@ -7,7 +7,7 @@ import (
 
 type Filter struct {
 	Name  string
-	Apply func(read im.Image, x int, y int) color.RGBA64
+	Apply func(read *im.Image, x int, y int) *color.RGBA64
 }
 
 // nom -> filtre
@@ -23,7 +23,7 @@ func GetSelectedFilter(args []string) *Filter {
 	}
 
 	if len(filter_name) > 0 {
-		return filters[filter_name]
+		return GetFilter(filter_name)
 	} else {
 		panic("Pas de filtre donné")
 	}
@@ -32,7 +32,7 @@ func GetFilter(filter_name string) *Filter {
 
 	return filters[filter_name]
 }
-func RegisterFilter(filter Filter) {
+func RegisterFilter(filter *Filter) {
 
-	filters[filter.Name] = &filter
+	filters[filter.Name] = filter
 }
