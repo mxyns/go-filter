@@ -44,4 +44,7 @@ func registerFilters() {
 
 	filters.RegisterFilter(&filters.Filter{Name: "invert", Apply: filfuncs.InvertColor})
 	filters.RegisterFilter(&filters.Filter{Name: "nullify", Apply: filfuncs.Nullify})
+	filters.RegisterFilter(&filters.Filter{Name: "copy", Apply: filfuncs.Identity})
+	filters.RegisterFilter(&filters.Filter{Name: "identity", Apply: filfuncs.Identity})
+	filters.RegisterFilter(&filters.Filter{Name: "print", Apply: filfuncs.Print})
 }
