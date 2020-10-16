@@ -36,9 +36,9 @@ func GetImageNames(args []string) []string {
 		panic("Pas d'images données en entrée")
 	}
 }
-func LoadImage(filename string) (*im.Image, string) {
+func LoadImage(filename *string) (*im.Image, string) {
 
-	file, err := os.Open(in_dir + filename)
+	file, err := os.Open(in_dir + *filename)
 	if err != nil {
 		fmt.Printf("Erreur chargement fichier : %v", err)
 		os.Exit(1)
@@ -53,14 +53,14 @@ func LoadImage(filename string) (*im.Image, string) {
 
 	return &image, format
 }
-func SaveImage(image *im.RGBA, name string, filter_name string) {
+func SaveImage(image *im.RGBA, name *string, filter_name *string) {
 
-	shards := strings.Split(name, ".")
+	shards := strings.Split(*name, ".")
 	new_name := ""
 	for i := range shards[:len(shards)-2] {
 		new_name += shards[i] + "."
 	}
-	new_name += shards[len(shards)-2] + "-" + filter_name + "." + shards[len(shards)-1]
+	new_name += shards[len(shards)-2] + "-" + *filter_name + "." + shards[len(shards)-1]
 
 	out, err := os.Create(out_dir + new_name)
 	if err != nil {

@@ -4,12 +4,12 @@ import (
 	filters "filter"
 	filfuncs "filter/funcs"
 	"fmt"
-	im "image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"imageio"
 	"os"
+	disp "routines"
 )
 
 // TODO : image mutable
@@ -23,21 +23,24 @@ func main() {
 	selected_filter := filters.GetSelectedFilter(os.Args[1:])
 
 	fmt.Printf("Images : %v\n", images_names)
-	for i := range images_names {
-		pimage, _ := imageio.LoadImage(images_names[i])
 
-		fmt.Printf("Taille image (%v) : %v\n", images_names[i], (*pimage).Bounds())
-		imW := im.NewRGBA((*pimage).Bounds())
-		for x := imW.Bounds().Min.X; x < imW.Bounds().Max.X; x++ {
-			for y := imW.Bounds().Min.Y; y < imW.Bounds().Max.Y; y++ {
-				imW.Set(x, y, selected_filter.Apply(pimage, x, y))
-			}
-		}
-
-		imageio.SaveImage(imW, images_names[i], selected_filter.Name)
-
-		fmt.Printf("Taille image sortie (%v) : %v\n", images_names[i], imW.Bounds())
+	for i := uint32(0); i < disp.WorkerCount; i++ {
+		disp.StartWorker(i)
 	}
+
+	disp.JobWaiter.Add(len(images_names))
+	for i := range images_names {
+
+		disp.QueueJob(&disp.Job{
+			InName:      &images_names[i],
+			Filter:      selected_filter,
+			SliceWidth:  disp.SliceWidth,
+			SliceHeight: disp.SliceHeight,
+		})
+	}
+
+	disp.JobWaiter.Wait()
+	close(disp.WorkQueue)
 }
 
 func registerFilters() {
