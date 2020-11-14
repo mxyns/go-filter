@@ -13,7 +13,7 @@ import (
 )
 
 // TODO : image mutable
-// TODO filtres : negatif, gris, reduction bruit (moyenne pix alentours), bords (diff), code barre
+// TODO filtres : gris, reduction bruit (moyenne pix alentours), bords (diff), code barre
 func main() {
 
 	registerFilters()
@@ -43,6 +43,9 @@ func main() {
 	close(disp.WorkQueue)
 }
 
+// TODO image => filtres => response until closed
+// TODO image + filtre(s) => reponse => close
+// binary.BigEndian à utiliser
 func registerFilters() {
 
 	filters.RegisterFilter(&filters.Filter{Name: "invert", Apply: filfuncs.InvertColor})

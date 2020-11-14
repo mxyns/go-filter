@@ -19,15 +19,15 @@ var (
 )
 var JobWaiter = sync.WaitGroup{}
 
-type ImageSlice struct {
-	image                      *im.Image
-	writeImg                   *im.RGBA
-	x_min, x_max, y_min, y_max uint32
-}
 type Job struct {
 	InName                                  *string
 	routines_count, SliceWidth, SliceHeight uint32
 	Filter                                  *filters.Filter
+}
+type ImageSlice struct {
+	image                      *im.Image
+	writeImg                   *im.RGBA
+	x_min, x_max, y_min, y_max uint32
 }
 
 func init() {
