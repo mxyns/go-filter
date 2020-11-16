@@ -8,17 +8,19 @@ import (
 	"strings"
 )
 
-var in_dir = "./in/"
-var out_dir = "./out/"
+const (
+	InDir  = "./in/"
+	OutDir = "./out/"
+)
 
 func init() {
 
-	if _, err := os.Stat(in_dir); os.IsNotExist(err) {
-		_ = os.Mkdir(in_dir, os.ModeDir)
+	if _, err := os.Stat(InDir); os.IsNotExist(err) {
+		_ = os.Mkdir(InDir, os.ModeDir)
 	}
 
-	if _, err := os.Stat(out_dir); os.IsNotExist(err) {
-		_ = os.Mkdir(out_dir, os.ModeDir)
+	if _, err := os.Stat(OutDir); os.IsNotExist(err) {
+		_ = os.Mkdir(OutDir, os.ModeDir)
 	}
 }
 
@@ -38,7 +40,7 @@ func GetImageNames(args []string) []string {
 }
 func LoadImage(filename *string) (*im.Image, string) {
 
-	file, err := os.Open(in_dir + *filename)
+	file, err := os.Open(*filename)
 	if err != nil {
 		fmt.Printf("Erreur chargement fichier : %v", err)
 		os.Exit(1)
@@ -53,16 +55,24 @@ func LoadImage(filename *string) (*im.Image, string) {
 
 	return &image, format
 }
-func SaveImage(image *im.RGBA, name *string, filter_name *string) {
+func SaveImage(image *im.RGBA, name *string, filter_name *string) *string {
 
-	shards := strings.Split(*name, ".")
+	shards := strings.Split(*name, "/")
+	filename := shards[len(shards)-1]
+
+	shards = strings.Split(filename, ".")
 	new_name := ""
-	for i := range shards[:len(shards)-2] {
-		new_name += shards[i] + "."
+	if len(shards) > 1 {
+		for i := range shards[:len(shards)-2] {
+			new_name += shards[i] + "."
+		}
+		new_name += shards[len(shards)-2] + "-" + *filter_name + "." + shards[len(shards)-1]
+	} else {
+		new_name = shards[0] + "-" + *filter_name + ".png"
 	}
-	new_name += shards[len(shards)-2] + "-" + *filter_name + "." + shards[len(shards)-1]
 
-	out, err := os.Create(out_dir + new_name)
+	outPath := OutDir + new_name
+	out, err := os.Create(outPath)
 	if err != nil {
 		fmt.Printf("Erreur creation fichier : %v", err)
 		os.Exit(1)
@@ -74,4 +84,6 @@ func SaveImage(image *im.RGBA, name *string, filter_name *string) {
 		fmt.Printf("Erreur ecriture image : %v", err)
 		os.Exit(1)
 	}
+
+	return &outPath
 }

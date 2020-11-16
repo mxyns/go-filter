@@ -2,27 +2,28 @@ package routines
 
 import (
 	filters "filter"
+	"flag"
 	"fmt"
 	im "image"
 	"imageio"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 )
 
 var WorkQueue chan *Job
 var (
-	SliceHeight uint32
-	SliceWidth  uint32
-	WorkerCount uint32
+	SliceHeight *uint
+	SliceWidth  *uint
+	WorkerCount *uint
 )
 var JobWaiter = sync.WaitGroup{}
 
 type Job struct {
 	InName                                  *string
-	routines_count, SliceWidth, SliceHeight uint32
+	OutPath                                 *string
+	routines_count, SliceWidth, SliceHeight *uint
 	Filter                                  *filters.Filter
+	SyncPoint                               *sync.WaitGroup
 }
 type ImageSlice struct {
 	image                      *im.Image
@@ -32,13 +33,16 @@ type ImageSlice struct {
 
 func init() {
 
-	WorkerCount, SliceWidth, SliceHeight = GetRoutineInfoFromArgs(os.Args[1:])
-	WorkQueue = make(chan *Job, 2)
+	WorkerCount = flag.Uint("r", 1, "number of image processing routines")
+	SliceWidth = flag.Uint("swidth", 100, "image slice width")
+	SliceHeight = flag.Uint("sheight", 100, "image slice height")
+
+	WorkQueue = make(chan *Job, 16)
 }
 
-func StartWorker(i uint32) {
+func StartWorker(i uint) {
 	fmt.Printf("Worker #%v => made\n", i)
-	go func(i uint32) {
+	go func(i uint) {
 		for {
 			fmt.Printf("Worker #%v => waiting\n", i)
 			job := <-WorkQueue
@@ -49,13 +53,20 @@ func StartWorker(i uint32) {
 	}(i)
 }
 
-func QueueJob(job *Job) {
+func QueueJob(job *Job) *Job {
+
+	JobWaiter.Add(1)
+	if job.SyncPoint != nil {
+		job.SyncPoint.Add(1)
+	}
 
 	WorkQueue <- job
 	fmt.Printf("=> Put %v on waiting list\n", *job.InName)
+
+	return job
 }
 
-func workerRoutine(job *Job, i uint32) {
+func workerRoutine(job *Job, i uint) {
 
 	begin := time.Now()
 	waitSlices := sync.WaitGroup{}
@@ -65,8 +76,16 @@ func workerRoutine(job *Job, i uint32) {
 	fmt.Printf("Worker #%v => loaded\n   -> Taille image (%v) : %v\n", i, *job.InName, (*pimage).Bounds())
 	imW := im.NewRGBA((*pimage).Bounds())
 
-	x_count := uint32(imW.Bounds().Max.X) / job.SliceWidth
-	y_count := uint32(imW.Bounds().Max.Y) / job.SliceHeight
+	if uint32(imW.Bounds().Max.X) < uint32(*job.SliceWidth) {
+		*job.SliceWidth = uint(imW.Bounds().Max.X)
+	}
+	if uint32(imW.Bounds().Max.Y) < uint32(*job.SliceHeight) {
+		*job.SliceHeight = uint(imW.Bounds().Max.Y)
+	}
+	x_count := uint32(imW.Bounds().Max.X) / uint32(*job.SliceWidth)
+	y_count := uint32(imW.Bounds().Max.Y) / uint32(*job.SliceHeight)
+
+	//TODO si on a le temps faire un modulo pour faire une slice plus petite si jamais il y a un reste >0
 	for i := uint32(0); i < x_count; i++ {
 		for j := uint32(0); j < y_count; j++ {
 			waitSlices.Add(1)
@@ -75,16 +94,16 @@ func workerRoutine(job *Job, i uint32) {
 				slice := ImageSlice{
 					image:    pimage,
 					writeImg: imW,
-					x_min:    job.SliceWidth * i,
-					x_max:    job.SliceWidth * (i + 1),
-					y_min:    job.SliceHeight * j,
-					y_max:    job.SliceHeight * (j + 1),
+					x_min:    uint32(*job.SliceWidth) * i,
+					x_max:    uint32(*job.SliceWidth) * (i + 1),
+					y_min:    uint32(*job.SliceHeight) * j,
+					y_max:    uint32(*job.SliceHeight) * (j + 1),
 				}
 				if i == x_count-1 {
-					slice.x_max = uint32(imW.Bounds().Max.Y)
+					slice.x_max = uint32(imW.Bounds().Max.X)
 				}
 				if j == y_count-1 {
-					slice.y_max = uint32(imW.Bounds().Max.X)
+					slice.y_max = uint32(imW.Bounds().Max.Y)
 				}
 
 				processSlice(&slice, job.Filter)
@@ -95,8 +114,12 @@ func workerRoutine(job *Job, i uint32) {
 
 	waitSlices.Wait()
 
-	imageio.SaveImage(imW, job.InName, &job.Filter.Name)
-	fmt.Printf("Worker #%v => finished\n   -> Taille image sortie (%v) : %v\n   -> Temps : %v\n", i, *job.InName, imW.Bounds(), time.Since(begin))
+	job.OutPath = imageio.SaveImage(imW, job.InName, &job.Filter.Name)
+	fmt.Printf("Worker #%v => finished\n   -> Taille image sortie (%v) : %v\n   -> Temps : %v\n", i, *job.OutPath, imW.Bounds(), time.Since(begin))
+
+	if job.SyncPoint != nil {
+		job.SyncPoint.Done()
+	}
 }
 
 func processSlice(slice *ImageSlice, filter *filters.Filter) {
@@ -106,27 +129,4 @@ func processSlice(slice *ImageSlice, filter *filters.Filter) {
 			(*slice.writeImg).Set(int(x), int(y), filter.Apply(slice.image, int(x), int(y)))
 		}
 	}
-}
-
-func GetRoutineInfoFromArgs(args []string) (uint32, uint32, uint32) {
-
-	coroutine_per_img_count, width, height := uint32(0), uint32(0), uint32(0)
-	for i := range args {
-		if args[i] == "--routines" || args[i] == "-r" && i+1 < len(args) {
-			r, _ := strconv.ParseUint(args[i+1], 10, 32)
-			coroutine_per_img_count = uint32(r)
-		} else if args[i] == "--swidth" || args[i] == "-w" && i+1 < len(args) {
-			r, _ := strconv.ParseUint(args[i+1], 10, 32)
-			width = uint32(r)
-		} else if args[i] == "--sheight" || args[i] == "-h" && i+1 < len(args) {
-			r, _ := strconv.ParseUint(args[i+1], 10, 32)
-			height = uint32(r)
-		}
-	}
-
-	if width <= 0 || height <= 0 || coroutine_per_img_count <= 0 {
-		panic("Wrong parameter values for swidth(" + strconv.Itoa(int(width)) + ") / sheight (" + strconv.Itoa(int(height)) + ") routines(" + strconv.Itoa(int(coroutine_per_img_count)) + ")")
-	}
-
-	return coroutine_per_img_count, width, height
 }

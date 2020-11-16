@@ -36,3 +36,7 @@ func RegisterFilter(filter *Filter) {
 
 	filters[filter.Name] = filter
 }
+func GetFilterRegister() map[string]*Filter {
+
+	return filters
+}
