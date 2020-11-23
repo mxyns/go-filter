@@ -1,4 +1,4 @@
-package imageio
+package io
 
 import (
 	"fmt"
@@ -24,20 +24,6 @@ func init() {
 	}
 }
 
-func GetImageNames(args []string) []string {
-
-	start := -1
-	for i := range args {
-		if args[i] == "-i" || args[i] == "--input" && i+1 < len(args) {
-			start = i + 1
-		}
-	}
-	if start > -1 {
-		return args[start:]
-	} else {
-		panic("Pas d'images données en entrée")
-	}
-}
 func LoadImage(filename *string) (*im.Image, string) {
 
 	file, err := os.Open(*filename)
@@ -86,4 +72,8 @@ func SaveImage(image *im.RGBA, name *string, filter_name *string) *string {
 	}
 
 	return &outPath
+}
+func RemoveFile(filename string) error {
+
+	return os.Remove(filename)
 }

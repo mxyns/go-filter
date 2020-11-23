@@ -1,17 +1,14 @@
-package pouf
+package main
 
 import (
-	"bufio"
 	"fmt"
-	"go-tcp/filet"
-	"go-tcp/filet/requests"
-	dRequests "go-tcp/filet/requests/default"
-	"os"
-	req "requests"
-	"sync"
+	req "github.com/mxyns/go-filter/requests"
+	"github.com/mxyns/go-tcp/filet"
+	"github.com/mxyns/go-tcp/filet/requests"
+	dRequests "github.com/mxyns/go-tcp/filet/requests/defaultRequests"
 )
 
-func MainClient(address *string, proto *string, port *uint, timeout *string) {
+func startClient(address *string, proto *string, port *uint, timeout *string) {
 
 	client := &filet.Client{
 		Address: &filet.Address{
@@ -26,17 +23,16 @@ func MainClient(address *string, proto *string, port *uint, timeout *string) {
 		return
 	}
 
-	secondCommunicationMethod(client, true)
+	firstCommunicationMethod(client)
 
 	//TODO lire le terminal du client pour faire une request
-	//TODO quand l'user dit "no" on supprime aussi son fichier pr libérer de l'espace
-	terminalInput(nil)
+	terminalInput() // opération bloquant la goroutine principale
 }
 
 func firstCommunicationMethod(client *filet.Client) {
 	response := *client.Send(requests.MakeGenericPack(
-		dRequests.MakeTextRequest("invert nullify copy identity copy invert identity"),
-		dRequests.MakeFileRequest("./in/sample-3.png", true),
+		dRequests.MakeTextRequest("invert"),
+		dRequests.MakeFileRequest("./in/7.png", true),
 	))
 
 	pack := response.(*requests.Pack)
@@ -69,21 +65,5 @@ func secondCommunicationMethod(client *filet.Client, doTwice bool) {
 		secondCommunicationMethod(client, false)
 	} else {
 		client.Send(work_continue.Answer("no"))
-	}
-}
-
-func terminalInput(group *sync.WaitGroup) {
-
-	scanner := bufio.NewScanner(os.Stdin)
-	for {
-		scanner.Scan()
-		line := scanner.Text()
-		fmt.Printf("got > %v\n", line)
-		if line == "stop" {
-			if group != nil {
-				group.Done()
-			}
-			break
-		}
 	}
 }

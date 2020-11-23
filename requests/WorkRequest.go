@@ -3,9 +3,13 @@ package _default
 import (
 	"encoding/binary"
 	"fmt"
-	"go-tcp/filet/requests"
+	"github.com/mxyns/go-tcp/filet/requests"
 	"io"
 	"net"
+)
+
+const (
+	WORK_REQUEST_ID = 3
 )
 
 type WorkRequest struct {
@@ -15,13 +19,13 @@ type WorkRequest struct {
 }
 
 func init() {
-	requests.RegisterRequestType(3, func(reqInfo *requests.RequestInfo) requests.Request { return &WorkRequest{info: reqInfo} })
+	requests.RegisterRequestType(WORK_REQUEST_ID, func(reqInfo *requests.RequestInfo) requests.Request { return &WorkRequest{info: reqInfo} })
 }
 
 func MakeWorkRequest(step byte, text string) *WorkRequest {
 	return &WorkRequest{
 		info: &requests.RequestInfo{
-			Id:            3,
+			Id:            WORK_REQUEST_ID,
 			WantsResponse: !(step == 1 && text == "no"),
 		},
 		text: text,

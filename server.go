@@ -1,14 +1,15 @@
-package pouf
+package main
 
 import (
-	filters "filter"
 	"fmt"
-	"go-tcp/filet"
-	gotcp "go-tcp/filet/requests"
-	dRequests "go-tcp/filet/requests/default"
+	filters "github.com/mxyns/go-filter/filter"
+	"github.com/mxyns/go-filter/io"
+	req "github.com/mxyns/go-filter/requests"
+	disp "github.com/mxyns/go-filter/routines"
+	"github.com/mxyns/go-tcp/filet"
+	gotcp "github.com/mxyns/go-tcp/filet/requests"
+	dRequests "github.com/mxyns/go-tcp/filet/requests/defaultRequests"
 	"net"
-	req "requests"
-	disp "routines"
 	"strings"
 	"sync"
 )
@@ -39,7 +40,7 @@ type WorkState struct {
 	step         byte
 }
 
-func MainServer(address *string, proto *string, port *uint) {
+func startServer(address *string, proto *string, port *uint) {
 
 	fmt.Printf("\n")
 	for i := uint(0); i < *disp.WorkerCount; i++ {
@@ -53,15 +54,16 @@ func MainServer(address *string, proto *string, port *uint) {
 			Port:  uint32(*port),
 		},
 		Clients:          make([]*net.Conn, 5),
-		ConnectionWaiter: &disp.JobWaiter,
+		ConnectionWaiter: disp.JobWaiter,
 		RequestHandler:   requestHandler,
 	}
 	defer server.Close()
-	server.Start()
+	defer close(disp.WorkQueue)
+	go server.Start()
 
-	terminalInput(&disp.JobWaiter)
-	disp.JobWaiter.Wait()
-	close(disp.WorkQueue)
+	// TODO clean stop (server will process but will not send back last processed image)
+	terminalInput()       // bloque jusqu'à lire "stop"
+	disp.JobWaiter.Wait() // bloque jusqu'à ce que tous les jobs soient terminés
 }
 
 func requestHandler(client *net.Conn, request *gotcp.Request) {
@@ -106,7 +108,7 @@ func handlePack(client *net.Conn, request *gotcp.Request) {
 
 	if pack.Info().WantsResponse {
 
-		response := packJobResults(gotcp.HalfUInt32+1+pack.SubId, jobs)
+		response := packJobResults(gotcp.MAX_PACK_SUBID+1+pack.SubId, jobs)
 
 		_, err, err_id := gotcp.SendRequestOn(client, &response)
 		if err != nil {
@@ -144,6 +146,7 @@ func handleWorkRequest(client *net.Conn, request *gotcp.Request) {
 			sendFilterList(client)
 		} else {
 			_ = (*client).Close()
+			_ = io.RemoveFile(*clientStates[client].current_path)
 			clientStates[client] = nil
 		}
 	}
@@ -152,7 +155,7 @@ func handleWorkRequest(client *net.Conn, request *gotcp.Request) {
 func sendFilterList(client *net.Conn) {
 
 	filterList := ""
-	filtersMap := filters.GetFilterRegister() // nom filtre -> Filtre
+	filtersMap := filters.GetFilterRegister() // map : nom filtre -> Filtre
 	for name := range filtersMap {
 		filterList += name + " "
 	}
@@ -172,11 +175,11 @@ func filterJob(filterList string, filename string, syncPoint *sync.WaitGroup) []
 	for i := range filter {
 		filename := filename
 		jobs[i] = disp.QueueJob(&disp.Job{
-			InName:      &filename,
-			Filter:      filters.GetFilter(filter[i]),
-			SliceWidth:  disp.SliceWidth,
-			SliceHeight: disp.SliceHeight,
-			SyncPoint:   syncPoint,
+			InName:          &filename,
+			Filter:          filters.GetFilter(filter[i]),
+			HorizSliceCount: disp.HorizSliceCount,
+			VertSliceCount:  disp.VertSliceCount,
+			SyncPoint:       syncPoint,
 		})
 	}
 
