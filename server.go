@@ -14,23 +14,6 @@ import (
 	"sync"
 )
 
-/*
-	type Work struct {
-		etape uint
-		texte string
-	}
-
-	etapes :
-		client => file
-		0. server => Work {etape:0, texte: "liste des filtres"}
-		client => Work {etape:0, texte: "filtre que jveux"}
-		server => Pack { Pack {requests: fichiers traités}, Work {etape:1, texte : "reuse img ?"} }
-		client => Work {etape:1, yes/no}
-			-> yes -> server => 0.
-			-> no -> close()
-
-*/
-
 var (
 	clientStates = make(map[*net.Conn]*WorkState)
 )
@@ -42,7 +25,7 @@ type WorkState struct {
 
 func startServer(address *string, proto *string, port *uint) {
 
-	fmt.Printf("\n")
+	// start n worker goroutines
 	for i := uint(0); i < *disp.WorkerCount; i++ {
 		disp.StartWorker(i)
 	}
@@ -90,10 +73,12 @@ func requestHandler(client *net.Conn, request *gotcp.Request) {
 				fmt.Printf("Client [%v] sent WorkRequest without File", client)
 			}
 		}
-
 	}
 }
 
+// first way for clients to communicate with server : send a Pack with a Text and a File (in this order)
+// Text content : "filter1 arg1 arg2 arg3 ... ; filter2 arg1 arg2 ..."
+// File content : png/jpg image
 func handlePack(client *net.Conn, request *gotcp.Request) {
 	pack := (*request).(*gotcp.Pack)
 	list := pack.GetRequests() // 0 : image, 1 : texte (liste filtres)
@@ -117,6 +102,17 @@ func handlePack(client *net.Conn, request *gotcp.Request) {
 	}
 }
 
+/* second way for clients to communicate with server
+etapes :
+
+	client 		=> file
+	0. server 	=> Work { etape:0, texte: "liste des filtres" }
+	client 		=> Work { etape:0, texte: "filtre que jveux" }
+	server 		=> Pack { Pack { requests: fichiers traités }, Work { etape:1, texte : "reuse img ?" } }
+	client 		=> Work {etape:1, yes/no}
+					-> yes -> server => goto 0.
+						-> no -> close()
+*/
 func handleWorkRequest(client *net.Conn, request *gotcp.Request) {
 
 	workReq := (*request).(*req.WorkRequest)
@@ -128,16 +124,20 @@ func handleWorkRequest(client *net.Conn, request *gotcp.Request) {
 	if step == 0 {
 
 		syncPoint := sync.WaitGroup{}
+
+		// process image
 		jobs := filterJob(text, *state.current_path, &syncPoint)
-		syncPoint.Wait()
+		syncPoint.Wait() // wait for all jobs termination
 
 		var response gotcp.Request = gotcp.MakePack(
 			1,
-			packJobResults(1, jobs),
+			packJobResults(1, jobs), // make pack from jobs results
 			req.MakeWorkRequest(1, "Do you want to reuse this image ? yes/no"),
 		)
 
+		// send result and get client response
 		clientResponse, _, _ := gotcp.SendRequestOn(client, &response)
+		// pass it through requestHandler (will come back to handleWorkRequest w/ step=1)
 		requestHandler(client, clientResponse)
 
 	} else if step == 1 {
@@ -152,16 +152,17 @@ func handleWorkRequest(client *net.Conn, request *gotcp.Request) {
 	}
 }
 
+// send filter list to client
 func sendFilterList(client *net.Conn) {
 
 	filterList := ""
 	filtersMap := filters.GetFilterRegister() // map : nom filtre -> Filtre
 	for name := range filtersMap {
-		filterList += name + " "
+		filterList += name + " | usage : " + filtersMap[name].Usage + "\n"
 	}
 	filterList = strings.TrimSpace(filterList)
 
-	var response gotcp.Request = req.MakeWorkRequest(0, "Filter list : "+filterList)
+	var response gotcp.Request = req.MakeWorkRequest(0, "Filter list : \n"+filterList)
 
 	clientResponse, _, _ := gotcp.SendRequestOn(client, &response)
 	requestHandler(client, clientResponse)
@@ -169,14 +170,15 @@ func sendFilterList(client *net.Conn) {
 
 func filterJob(filterList string, filename string, syncPoint *sync.WaitGroup) []*disp.Job {
 
-	filter := strings.Split(filterList, " ")
+	filter := strings.Split(filterList, ";")
 
 	jobs := make([]*disp.Job, len(filter))
 	for i := range filter {
-		filename := filename
+		shards := strings.Split(strings.TrimSpace(filter[i]), " ")
 		jobs[i] = disp.QueueJob(&disp.Job{
 			InName:          &filename,
-			Filter:          filters.GetFilter(filter[i]),
+			Filter:          filters.GetFilter(shards[0]),
+			FilterArgs:      shards[1:],
 			HorizSliceCount: disp.HorizSliceCount,
 			VertSliceCount:  disp.VertSliceCount,
 			SyncPoint:       syncPoint,

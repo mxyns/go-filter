@@ -6,28 +6,15 @@ import (
 )
 
 type Filter struct {
-	Name  string
-	Apply func(read *im.Image, x int, y int) *color.RGBA64
+	Name   string
+	Usage  string
+	Parser func(filter *Filter, args *[]string) *map[string]interface{}
+	Apply  func(read *im.Image, x int, y int, args *map[string]interface{}) *color.RGBA64
 }
 
 // nom -> filtre
 var filters = map[string]*Filter{}
 
-func GetSelectedFilter(args []string) *Filter {
-
-	filter_name := ""
-	for i := range args {
-		if args[i] == "-f" || args[i] == "--filter" && i+1 < len(args) {
-			filter_name = args[i+1]
-		}
-	}
-
-	if len(filter_name) > 0 {
-		return GetFilter(filter_name)
-	} else {
-		panic("Pas de filtre donné")
-	}
-}
 func GetFilter(filter_name string) *Filter {
 
 	return filters[filter_name]

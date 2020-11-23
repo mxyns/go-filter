@@ -29,6 +29,7 @@ type Job struct {
 	OutPath                         *string         // path to output file
 	VertSliceCount, HorizSliceCount *uint           // horizontal and vertical image fragmentation count
 	Filter                          *filters.Filter // filter to apply
+	FilterArgs                      []string        // arguments for the filter
 	SyncPoint                       *sync.WaitGroup // WaitGroup used to synchronize wait for multiple Job termination
 	Duration                        *time.Duration  // image processing duration
 }
@@ -80,12 +81,20 @@ func QueueJob(job *Job) *Job {
 
 func workerRoutine(job *Job, i uint) {
 
+	var args *map[string]interface{}
+	if parser := job.Filter.Parser; parser != nil {
+		args = parser(job.Filter, &job.FilterArgs)
+	} else {
+		args = nil
+	}
+
 	begin := time.Now()
 	waitSlices := sync.WaitGroup{}
 
 	pimage, _ := io.LoadImage(job.InName)
 
 	fmt.Printf("Worker #%v => loaded\n   -> Taille image (%v) : %v\n", i, *job.InName, (*pimage).Bounds())
+	fmt.Printf("Worker #%v => loaded\n   -> Arguments (%v) : %v\n", i, len(job.FilterArgs), job.FilterArgs)
 	imW := im.NewRGBA((*pimage).Bounds())
 
 	sliceWidth := uint(imW.Bounds().Max.X) / *HorizSliceCount
@@ -112,7 +121,7 @@ func workerRoutine(job *Job, i uint) {
 					slice.y_max = uint(imW.Bounds().Max.Y)
 				}
 
-				processSlice(&slice, job.Filter)
+				processSlice(&slice, job.Filter, args)
 				waitSlices.Done()
 			}(i, j)
 		}
@@ -130,11 +139,11 @@ func workerRoutine(job *Job, i uint) {
 	}
 }
 
-func processSlice(slice *ImageSlice, filter *filters.Filter) {
+func processSlice(slice *ImageSlice, filter *filters.Filter, args *map[string]interface{}) {
 
 	for x := slice.x_min; x < slice.x_max; x++ {
 		for y := slice.y_min; y < slice.y_max; y++ {
-			(*slice.writeImg).Set(int(x), int(y), filter.Apply(slice.image, int(x), int(y)))
+			(*slice.writeImg).Set(int(x), int(y), filter.Apply(slice.image, int(x), int(y), args))
 		}
 	}
 }

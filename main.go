@@ -24,6 +24,7 @@ func init() {
 // TODO filtres : gris, reduction bruit (moyenne pix alentours), bords (diff), code barre
 func main() {
 
+	// define general flags (some are defined in other packages' init functions, e.g: routines)
 	runServer := flag.Bool("s", false, "run in server mode")
 	address := flag.String("a", "127.0.0.1", "address to host on / connect to")
 	proto := flag.String("P", "tcp", "protocol")
@@ -34,6 +35,7 @@ func main() {
 
 	flag.Parse()
 
+	// apply custom log formatter for go-tcp logs
 	if *customFormatter {
 		log.SetFormatter(&io.Formatter{
 			TimestampFormat: "2006-01-02 15:04:05",
@@ -41,6 +43,7 @@ func main() {
 		})
 	}
 
+	// apply custom debug level for go-tcp logs
 	level, err := log.ParseLevel(*debugLevel)
 	if err != nil {
 		fmt.Printf("%v\n", err)
@@ -50,6 +53,7 @@ func main() {
 
 	registerFilters()
 
+	// free disk space on close
 	defer fileio.ClearDir("./dl")
 	defer fileio.ClearDir("./out")
 
@@ -62,11 +66,14 @@ func main() {
 
 func registerFilters() {
 
-	filters.RegisterFilter(&filters.Filter{Name: "invert", Apply: filfuncs.InvertColor})
-	filters.RegisterFilter(&filters.Filter{Name: "nullify", Apply: filfuncs.Nullify})
-	filters.RegisterFilter(&filters.Filter{Name: "copy", Apply: filfuncs.Identity})
-	filters.RegisterFilter(&filters.Filter{Name: "identity", Apply: filfuncs.Identity})
-	filters.RegisterFilter(&filters.Filter{Name: "print", Apply: filfuncs.Print})
+	filters.RegisterFilter(&filters.Filter{Name: "invert", Usage: "no args needed", Apply: filfuncs.InvertColor})
+	filters.RegisterFilter(&filters.Filter{Name: "edges", Usage: "no args needed", Apply: filfuncs.FindEdges, Parser: filfuncs.ParseFindEdgesArgs})
+
+	// useless filters
+	filters.RegisterFilter(&filters.Filter{Name: "nullify", Usage: "no args needed", Apply: filfuncs.Nullify})
+	filters.RegisterFilter(&filters.Filter{Name: "copy", Usage: "no args needed", Apply: filfuncs.Identity})
+	filters.RegisterFilter(&filters.Filter{Name: "identity", Usage: "no args needed", Apply: filfuncs.Identity})
+	filters.RegisterFilter(&filters.Filter{Name: "print", Usage: "no args needed", Apply: filfuncs.Print})
 }
 
 func terminalInput() {

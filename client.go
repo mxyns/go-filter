@@ -6,6 +6,7 @@ import (
 	"github.com/mxyns/go-tcp/filet"
 	"github.com/mxyns/go-tcp/filet/requests"
 	dRequests "github.com/mxyns/go-tcp/filet/requests/defaultRequests"
+	"time"
 )
 
 func startClient(address *string, proto *string, port *uint, timeout *string) {
@@ -20,10 +21,15 @@ func startClient(address *string, proto *string, port *uint, timeout *string) {
 	defer client.Close()
 	_, err := client.Start(*timeout)
 	if err != nil {
+		fmt.Println("Couldn't connect to server.")
 		return
 	}
 
 	firstCommunicationMethod(client)
+
+	time.Sleep(3000)
+
+	secondCommunicationMethod(client, false)
 
 	//TODO lire le terminal du client pour faire une request
 	terminalInput() // opération bloquant la goroutine principale
@@ -31,8 +37,8 @@ func startClient(address *string, proto *string, port *uint, timeout *string) {
 
 func firstCommunicationMethod(client *filet.Client) {
 	response := *client.Send(requests.MakeGenericPack(
-		dRequests.MakeTextRequest("invert"),
-		dRequests.MakeFileRequest("./in/7.png", true),
+		dRequests.MakeTextRequest("invert ; edges 5 haha 10"),
+		dRequests.MakeFileRequest("./in/sample-3.png", true),
 	))
 
 	pack := response.(*requests.Pack)
@@ -58,7 +64,7 @@ func secondCommunicationMethod(client *filet.Client, doTwice bool) {
 		)
 	}
 
-	fmt.Printf("Step #%v -> server told me : %v\n", work_continue.GetStep(), work_continue.GetText())
+	fmt.Printf("Step #%v -> server told me : \n%v\n", work_continue.GetStep(), work_continue.GetText())
 
 	if doTwice {
 		client.Send(work_continue.Answer("yes"))

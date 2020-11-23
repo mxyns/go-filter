@@ -6,7 +6,7 @@ import (
 	"image/color"
 )
 
-func InvertColor(read *im.Image, x int, y int) *color.RGBA64 {
+func InvertColor(read *im.Image, x int, y int, _ *map[string]interface{}) *color.RGBA64 {
 	rr, gg, bb, aa := (*read).At(x, y).RGBA()
 
 	r := aa - rr
@@ -14,18 +14,14 @@ func InvertColor(read *im.Image, x int, y int) *color.RGBA64 {
 	b := aa - bb
 	return &color.RGBA64{R: uint16(r), G: uint16(g), B: uint16(b), A: uint16(aa)}
 }
-func FindEdge(read *im.Image, x int, y int, size int, threshold float64) *color.RGBA64 {
-
+func Nullify(read *im.Image, x int, y int, _ *map[string]interface{}) *color.RGBA64 {
 	return &color.RGBA64{}
 }
-func Nullify(read *im.Image, x int, y int) *color.RGBA64 {
-	return &color.RGBA64{}
-}
-func Identity(read *im.Image, x, y int) *color.RGBA64 {
+func Identity(read *im.Image, x, y int, _ *map[string]interface{}) *color.RGBA64 {
 	rr, gg, bb, aa := (*read).At(x, y).RGBA()
 	return &color.RGBA64{R: uint16(rr), G: uint16(gg), B: uint16(bb), A: uint16(aa)}
 }
-func Print(read *im.Image, x, y int) *color.RGBA64 {
+func Print(read *im.Image, x, y int, _ *map[string]interface{}) *color.RGBA64 {
 	rr, gg, bb, aa := (*read).At(x, y).RGBA()
 
 	if aa != 0 {
