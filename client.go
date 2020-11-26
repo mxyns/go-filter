@@ -1,13 +1,28 @@
 package main
 
 import (
+	"bufio"
+	"flag"
 	"fmt"
+	"github.com/mxyns/go-filter/io"
 	req "github.com/mxyns/go-filter/requests"
 	"github.com/mxyns/go-tcp/filet"
 	"github.com/mxyns/go-tcp/filet/requests"
 	dRequests "github.com/mxyns/go-tcp/filet/requests/defaultRequests"
-	"time"
+	"os"
+	"strings"
 )
+
+var (
+	filePathArg   *string
+	filterListArg *string
+)
+
+func init() {
+
+	filePathArg = flag.String("i", "", "client image file path to use")
+	filterListArg = flag.String("fl", "copy", "client filter list to apply to image provided with -i. e.g: invert ; blur 5 ; etc")
+}
 
 func startClient(address *string, proto *string, port *uint, timeout *string) {
 
@@ -25,51 +40,65 @@ func startClient(address *string, proto *string, port *uint, timeout *string) {
 		return
 	}
 
-	firstCommunicationMethod(client)
+	if len(*filePathArg) > 0 {
+		firstCommunicationMethod(client)
+	} else {
+		secondCommunicationMethod(client, nil)
+	}
 
-	time.Sleep(3000)
-
-	secondCommunicationMethod(client, false)
-
-	//TODO lire le terminal du client pour faire une request
 	terminalInput() // opération bloquant la goroutine principale
 }
 
 func firstCommunicationMethod(client *filet.Client) {
+
 	response := *client.Send(requests.MakeGenericPack(
-		dRequests.MakeTextRequest("invert ; edges 5 haha 10"),
-		dRequests.MakeFileRequest("./in/sample-3.png", true),
+		dRequests.MakeTextRequest(strings.TrimSpace(*filterListArg)),
+		dRequests.MakeFileRequest(strings.TrimSpace(*filePathArg), true),
 	))
 
 	pack := response.(*requests.Pack)
-	fmt.Println("Received files :")
-	for i := range pack.GetRequests() {
-		fmt.Printf("	-> %v\n", (*pack.GetRequests()[i]).(*dRequests.FileRequest).GetPath())
-	}
+
+	fmt.Printf("Step #1 got results : \n")
+	io.RenameFiles(pack, filePathArg, *filterListArg)
 }
 
-func secondCommunicationMethod(client *filet.Client, doTwice bool) {
-	work_filter_list := (*client.Send(dRequests.MakeFileRequest("./in/sample-3.png", true))).(*req.WorkRequest)
-	fmt.Printf("Step #%v -> server told me : %v\n", work_filter_list.GetStep(), work_filter_list.GetText())
+func secondCommunicationMethod(client *filet.Client, previous *req.WorkRequest) {
 
-	work_result_pack := (*client.Send(work_filter_list.Answer("invert"))).(*requests.Pack)
-	results := (*work_result_pack.GetRequests()[0]).(*requests.Pack)
-	work_continue := (*work_result_pack.GetRequests()[1]).(*req.WorkRequest)
-	for i := range results.GetRequests() {
-		fmt.Printf(
-			"Step #%v -> got result file : path=%v size=%v\n",
-			work_continue.GetStep(),
-			(*results.GetRequests()[i]).(*dRequests.FileRequest).GetPath(),
-			(*results.GetRequests()[i]).(*dRequests.FileRequest).GetFileSize(),
-		)
+	work_filter_list := previous
+	scanner := bufio.NewScanner(os.Stdin)
+	if previous == nil { // first run of the function (not after a "yes" when asked if wanna reuse img)
+
+		*filePathArg = userInput(scanner, "File path > ") // use filePathArg to store value
+		work_filter_list = (*client.Send(dRequests.MakeFileRequest(*filePathArg, true))).(*req.WorkRequest)
 	}
 
-	fmt.Printf("Step #%v -> server told me : \n%v\n", work_continue.GetStep(), work_continue.GetText())
+	fmt.Printf("Step #%v -> \n", work_filter_list.GetStep())
+	fmt.Printf("%v\n", work_filter_list.GetText())
 
-	if doTwice {
-		client.Send(work_continue.Answer("yes"))
-		secondCommunicationMethod(client, false)
+	filters := userInput(scanner, "filters > ")
+
+	// work_result_pack:Pack { results:Pack {img, img, img, ...}, work_continue:WorkRequest }
+	work_result_pack := (*client.Send(work_filter_list.Answer(filters))).(*requests.Pack)
+	results := (*work_result_pack.GetRequests()[0]).(*requests.Pack)
+	work_continue := (*work_result_pack.GetRequests()[1]).(*req.WorkRequest)
+
+	// treat result (rename & print)
+	fmt.Printf("Step #1 got results : \n")
+	io.RenameFiles(results, filePathArg, filters)
+
+	fmt.Printf("Step #%v -> ", work_continue.GetStep())
+	repeatInput := userInput(scanner, work_continue.GetText()+" > ")
+	if repeatInput == "y" || repeatInput == "yes" {
+		work_filter_list = (*client.Send(work_continue.Answer("yes"))).(*req.WorkRequest)
+		secondCommunicationMethod(client, work_filter_list) // reuse this function with context
 	} else {
 		client.Send(work_continue.Answer("no"))
 	}
+}
+
+func userInput(scanner *bufio.Scanner, text string) string {
+
+	fmt.Printf(text)
+	scanner.Scan()
+	return strings.TrimSpace(scanner.Text())
 }

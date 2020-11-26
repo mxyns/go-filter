@@ -5,7 +5,6 @@ import (
 	im "image"
 	"image/png"
 	"os"
-	"strings"
 )
 
 const (
@@ -41,21 +40,9 @@ func LoadImage(filename *string) (*im.Image, string) {
 
 	return &image, format
 }
-func SaveImage(image *im.RGBA, name *string, filter_name *string) *string {
+func SaveImage(image *im.RGBA, path *string, filter_name *string) *string {
 
-	shards := strings.Split(*name, "/")
-	filename := shards[len(shards)-1]
-
-	shards = strings.Split(filename, ".")
-	new_name := ""
-	if len(shards) > 1 {
-		for i := range shards[:len(shards)-2] {
-			new_name += shards[i] + "."
-		}
-		new_name += shards[len(shards)-2] + "-" + *filter_name + "." + shards[len(shards)-1]
-	} else {
-		new_name = shards[0] + "-" + *filter_name + ".png"
-	}
+	new_name, _ := FormatImageName(path, filter_name)
 
 	outPath := OutDir + new_name
 	out, err := os.Create(outPath)
@@ -72,8 +59,4 @@ func SaveImage(image *im.RGBA, name *string, filter_name *string) *string {
 	}
 
 	return &outPath
-}
-func RemoveFile(filename string) error {
-
-	return os.Remove(filename)
 }

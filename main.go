@@ -8,6 +8,7 @@ import (
 	filfuncs "github.com/mxyns/go-filter/filter/funcs"
 	"github.com/mxyns/go-filter/io"
 	"github.com/mxyns/go-tcp/fileio"
+	"github.com/mxyns/go-tcp/filet/requests/defaultRequests"
 	log "github.com/sirupsen/logrus"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -16,12 +17,15 @@ import (
 )
 
 func init() {
+
+	fileio.MAX_FILE_BUFFER_SIZE *= 2
+
 	log.SetLevel(log.PanicLevel)
 }
 
 // TODO gotcp ajouter parametre pour ignore le Await de wantsUserResponse dans SendRequestOn
-// TODO parametres pour les filtres
-// TODO filtres : gris, reduction bruit (moyenne pix alentours), bords (diff), code barre
+// TODO filtres : bords (diff), élargir en x ou y
+// TODO doc
 func main() {
 
 	// define general flags (some are defined in other packages' init functions, e.g: routines)
@@ -30,7 +34,7 @@ func main() {
 	proto := flag.String("P", "tcp", "protocol")
 	port := flag.Uint("p", 8887, "port")
 	timeout := flag.String("t", "10s", "client connection timeout")
-	debugLevel := flag.String("l", "panic", "client connection timeout")
+	debugLevel := flag.String("l", "panic", "debug level")
 	customFormatter := flag.Bool("f", true, "use custom formatter for network log")
 
 	flag.Parse()
@@ -54,8 +58,8 @@ func main() {
 	registerFilters()
 
 	// free disk space on close
-	defer fileio.ClearDir("./dl")
-	defer fileio.ClearDir("./out")
+	defer fileio.ClearDir("./" + defaultRequests.TARGET_DIRECTORY)
+	defer fileio.ClearDir(io.OutDir)
 
 	if *runServer {
 		startServer(address, proto, port)
@@ -67,13 +71,20 @@ func main() {
 func registerFilters() {
 
 	filters.RegisterFilter(&filters.Filter{Name: "invert", Usage: "no args needed", Apply: filfuncs.InvertColor})
+	filters.RegisterFilter(&filters.Filter{Name: "grayScaleAverage", Usage: "no args needed", Apply: filfuncs.GrayScaleAverage})
+	filters.RegisterFilter(&filters.Filter{Name: "grayScaleLuminosity", Usage: "no args needed", Apply: filfuncs.GrayScaleLuminosity})
+	filters.RegisterFilter(&filters.Filter{Name: "grayScaleDesaturation", Usage: "no args needed", Apply: filfuncs.GrayScaleDesaturation})
+
+	// TODO add
+	// TODO add param
 	filters.RegisterFilter(&filters.Filter{Name: "edges", Usage: "no args needed", Apply: filfuncs.FindEdges, Parser: filfuncs.ParseFindEdgesArgs})
+	// TODO add param
+	filters.RegisterFilter(&filters.Filter{Name: "noiseReduction", Usage: "no args needed", Apply: filfuncs.NoiseReduction})
 
 	// useless filters
 	filters.RegisterFilter(&filters.Filter{Name: "nullify", Usage: "no args needed", Apply: filfuncs.Nullify})
 	filters.RegisterFilter(&filters.Filter{Name: "copy", Usage: "no args needed", Apply: filfuncs.Identity})
 	filters.RegisterFilter(&filters.Filter{Name: "identity", Usage: "no args needed", Apply: filfuncs.Identity})
-	filters.RegisterFilter(&filters.Filter{Name: "print", Usage: "no args needed", Apply: filfuncs.Print})
 }
 
 func terminalInput() {

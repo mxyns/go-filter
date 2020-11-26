@@ -2,6 +2,7 @@
 package io
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,8 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 				s = strconv.FormatBool(v)
 			case error:
 				s = v.Error()
+			default:
+				s = fmt.Sprintf("%v", val)
 			}
 
 			data += k + "=" + s + ", "

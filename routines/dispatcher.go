@@ -40,7 +40,6 @@ type ImageSlice struct {
 }
 
 func init() {
-
 	WorkerCount = flag.Uint("r", 1, "number of image processing routines")
 	VertSliceCount = flag.Uint("scvert", 5, "vertical slice count per image")
 	HorizSliceCount = flag.Uint("schor", 5, "horizontal slice count per image")

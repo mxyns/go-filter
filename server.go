@@ -36,7 +36,7 @@ func startServer(address *string, proto *string, port *uint) {
 			Addr:  *address,
 			Port:  uint32(*port),
 		},
-		Clients:          make([]*net.Conn, 5),
+		Clients:          make([]*net.Conn, 0),
 		ConnectionWaiter: disp.JobWaiter,
 		RequestHandler:   requestHandler,
 	}
@@ -49,7 +49,7 @@ func startServer(address *string, proto *string, port *uint) {
 	disp.JobWaiter.Wait() // bloque jusqu'à ce que tous les jobs soient terminés
 }
 
-func requestHandler(client *net.Conn, request *gotcp.Request) {
+func requestHandler(client *net.Conn, request *gotcp.Request) { //FIXME check if ptr != nil or use recovery
 	switch (*request).(type) {
 	case *gotcp.Pack:
 		{
@@ -175,14 +175,18 @@ func filterJob(filterList string, filename string, syncPoint *sync.WaitGroup) []
 	jobs := make([]*disp.Job, len(filter))
 	for i := range filter {
 		shards := strings.Split(strings.TrimSpace(filter[i]), " ")
-		jobs[i] = disp.QueueJob(&disp.Job{
-			InName:          &filename,
-			Filter:          filters.GetFilter(shards[0]),
-			FilterArgs:      shards[1:],
-			HorizSliceCount: disp.HorizSliceCount,
-			VertSliceCount:  disp.VertSliceCount,
-			SyncPoint:       syncPoint,
-		})
+		if filter := filters.GetFilter(shards[0]); filter != nil {
+			jobs[i] = disp.QueueJob(&disp.Job{
+				InName:          &filename,
+				Filter:          filter,
+				FilterArgs:      shards[1:],
+				HorizSliceCount: disp.HorizSliceCount,
+				VertSliceCount:  disp.VertSliceCount,
+				SyncPoint:       syncPoint,
+			})
+		} else {
+			jobs[i] = nil
+		}
 	}
 
 	return jobs
@@ -192,7 +196,11 @@ func packJobResults(id uint32, jobs []*disp.Job) gotcp.Request {
 
 	imagesRequests := make([]gotcp.Request, len(jobs))
 	for i := range jobs {
-		imagesRequests[i] = dRequests.MakeFileRequest(*jobs[i].OutPath, false)
+		if job := jobs[i]; job != nil {
+			imagesRequests[i] = dRequests.MakeFileRequest(*jobs[i].OutPath, false)
+		} else {
+			imagesRequests[i] = dRequests.MakeTextRequest("Unknown filter")
+		}
 	}
 
 	return gotcp.MakePack(id, imagesRequests...)
