@@ -44,13 +44,13 @@ func startClient(address *string, proto *string, port *uint, timeout *string) {
 		firstCommunicationMethod(client)
 	} else {
 		secondCommunicationMethod(client, nil)
+		terminalInput() // opération bloquant la goroutine principale
 	}
-
-	terminalInput() // opération bloquant la goroutine principale
 }
 
 func firstCommunicationMethod(client *filet.Client) {
 
+	//send a pack with the args
 	response := *client.Send(requests.MakeGenericPack(
 		dRequests.MakeTextRequest(strings.TrimSpace(*filterListArg)),
 		dRequests.MakeFileRequest(strings.TrimSpace(*filePathArg), true),

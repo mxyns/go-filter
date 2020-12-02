@@ -1,13 +1,29 @@
 package funcs
 
 import (
+	"github.com/mxyns/go-filter/filter"
 	im "image"
 	"image/color"
+	"strconv"
 )
 
-func NoiseReduction(read *im.Image, x int, y int, _ *map[string]interface{}) *color.RGBA64 {
+//Get the value of the radius
+func ParseNoiseReductionArgs(_ *filter.Filter, args *map[string]interface{}) *map[string]interface{} {
 
-	r := 1 // TODO as arg
+	// ["radius"]
+	if arg := (*args)["radius"]; arg != nil {
+		(*args)["radius"], _ = strconv.Atoi(arg.(string))
+	} else {
+		(*args)["radius"] = 1
+	}
+
+	return args
+}
+
+//Calculate for each pixel the noise reduction applied according to radius
+func NoiseReduction(read *im.Image, x int, y int, args *map[string]interface{}) *color.RGBA64 {
+
+	var r = ((*args)["radius"]).(int)
 
 	xMin := maxInt(x-r, (*read).Bounds().Min.X)
 	yMin := maxInt(y-r, (*read).Bounds().Min.Y)

@@ -8,7 +8,10 @@ import (
 )
 
 const (
-	InDir  = "./in/"
+	InDir = "./in/"
+)
+
+var (
 	OutDir = "./out/"
 )
 
@@ -40,9 +43,9 @@ func LoadImage(filename *string) (*im.Image, string) {
 
 	return &image, format
 }
-func SaveImage(image *im.RGBA, path *string, filter_name *string) *string {
+func SaveImage(image *im.RGBA, path *string, filter_name *string, args *[]string) *string {
 
-	new_name, _ := FormatImageName(path, filter_name)
+	new_name, _ := FormatImageName(path, filter_name, args)
 
 	outPath := OutDir + new_name
 	out, err := os.Create(outPath)

@@ -44,12 +44,18 @@ func startServer(address *string, proto *string, port *uint) {
 	defer close(disp.WorkQueue)
 	go server.Start()
 
-	// TODO clean stop (server will process but will not send back last processed image)
+	// TODO clean stop (server will process but will not send back last processed image when stopped during processing)
 	terminalInput()       // bloque jusqu'à lire "stop"
 	disp.JobWaiter.Wait() // bloque jusqu'à ce que tous les jobs soient terminés
 }
 
-func requestHandler(client *net.Conn, request *gotcp.Request) { //FIXME check if ptr != nil or use recovery
+func requestHandler(client *net.Conn, request *gotcp.Request) {
+
+	if request == nil {
+		_ = (*client).Close()
+		return
+	}
+
 	switch (*request).(type) {
 	case *gotcp.Pack:
 		{
@@ -103,7 +109,7 @@ func handlePack(client *net.Conn, request *gotcp.Request) {
 }
 
 /* second way for clients to communicate with server
-etapes :
+step :
 
 	client 		=> file
 	0. server 	=> Work { etape:0, texte: "liste des filtres" }
@@ -146,7 +152,7 @@ func handleWorkRequest(client *net.Conn, request *gotcp.Request) {
 			sendFilterList(client)
 		} else {
 			_ = (*client).Close()
-			_ = io.RemoveFile(*clientStates[client].current_path)
+			_ = io.RemoveFile(clientStates[client].current_path)
 			clientStates[client] = nil
 		}
 	}

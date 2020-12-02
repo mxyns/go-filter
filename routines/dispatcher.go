@@ -6,6 +6,7 @@ import (
 	filters "github.com/mxyns/go-filter/filter"
 	"github.com/mxyns/go-filter/io"
 	im "image"
+	"strings"
 	"sync"
 	"time"
 )
@@ -78,13 +79,22 @@ func QueueJob(job *Job) *Job {
 	return job
 }
 
+//Calculate image slice + call processSlice for each slice
 func workerRoutine(job *Job, i uint) {
 
-	var args *map[string]interface{}
+	fmt.Printf("\t%v -> Raw Arguments (%v) : %v\n", i, len(job.FilterArgs), job.FilterArgs)
+
+	var args = make(map[string]interface{})
+	var argsPtr *map[string]interface{}
+	for _, val := range job.FilterArgs {
+		if arr := strings.Split(val, "="); len(arr) == 2 {
+			args[arr[0]] = arr[1]
+		}
+	}
 	if parser := job.Filter.Parser; parser != nil {
-		args = parser(job.Filter, &job.FilterArgs)
+		argsPtr = parser(job.Filter, &args)
 	} else {
-		args = nil
+		argsPtr = nil
 	}
 
 	begin := time.Now()
@@ -92,8 +102,8 @@ func workerRoutine(job *Job, i uint) {
 
 	pimage, _ := io.LoadImage(job.InName)
 
-	fmt.Printf("Worker #%v => loaded\n   -> Taille image (%v) : %v\n", i, *job.InName, (*pimage).Bounds())
-	fmt.Printf("Worker #%v => loaded\n   -> Arguments (%v) : %v\n", i, len(job.FilterArgs), job.FilterArgs)
+	fmt.Printf("Worker #%v => loaded\n\t%v -> Taille image (%v) : %v\n", i, i, *job.InName, (*pimage).Bounds())
+	fmt.Printf("\t%v -> Arguments (%v) : %v\n", i, len(job.FilterArgs), args)
 	imW := im.NewRGBA((*pimage).Bounds())
 
 	sliceWidth := uint(imW.Bounds().Max.X) / *HorizSliceCount
@@ -120,7 +130,7 @@ func workerRoutine(job *Job, i uint) {
 					slice.y_max = uint(imW.Bounds().Max.Y)
 				}
 
-				processSlice(&slice, job.Filter, args)
+				processSlice(&slice, job.Filter, argsPtr)
 				waitSlices.Done()
 			}(i, j)
 		}
@@ -130,14 +140,15 @@ func workerRoutine(job *Job, i uint) {
 
 	duration := time.Since(begin)
 	job.Duration = &duration
-	job.OutPath = io.SaveImage(imW, job.InName, &job.Filter.Name)
-	fmt.Printf("Worker #%v => finished\n   -> Taille image sortie (%v) : %v\n   -> Temps : %v\n", i, *job.OutPath, imW.Bounds(), job.Duration)
+	job.OutPath = io.SaveImage(imW, job.InName, &job.Filter.Name, &job.FilterArgs)
+	fmt.Printf("Worker #%v => finished\n   %v -> Taille image sortie (%v) : %v\n   -> Temps : %v\n", i, *job.OutPath, imW.Bounds(), job.Duration, i)
 
 	if job.SyncPoint != nil {
 		job.SyncPoint.Done()
 	}
 }
 
+//Apply filter + write the image for each slice
 func processSlice(slice *ImageSlice, filter *filters.Filter, args *map[string]interface{}) {
 
 	for x := slice.x_min; x < slice.x_max; x++ {
