@@ -25,8 +25,6 @@ func init() {
 
 // todo gotcp ajouter parametre pour ignore le Await de wantsUserResponse dans SendRequestOn
 // todo filtres : possibilité d'élargir en x ou y
-
-// TODO benchmark
 func main() {
 
 	// define general flags (some are defined in other packages' init functions, e.g: routines)
@@ -76,8 +74,6 @@ func main() {
 }
 
 func registerFilters() {
-
-	// TODO change Usage
 
 	filters.RegisterFilter(&filters.Filter{Name: "invert", Usage: "no args needed", Apply: filfuncs.InvertColor})
 	filters.RegisterFilter(&filters.Filter{Name: "grayScaleAverage", Usage: "no args needed", Apply: filfuncs.GrayScaleAverage})

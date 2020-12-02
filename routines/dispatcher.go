@@ -141,7 +141,7 @@ func workerRoutine(job *Job, i uint) {
 	duration := time.Since(begin)
 	job.Duration = &duration
 	job.OutPath = io.SaveImage(imW, job.InName, &job.Filter.Name, &job.FilterArgs)
-	fmt.Printf("Worker #%v => finished\n   %v -> Taille image sortie (%v) : %v\n   -> Temps : %v\n", i, *job.OutPath, imW.Bounds(), job.Duration, i)
+	fmt.Printf("Worker #%v => finished\n   %v -> Taille image sortie (%v) : %v\n   %v -> Temps : %v\n", i, i, *job.OutPath, imW.Bounds(), i, job.Duration)
 
 	if job.SyncPoint != nil {
 		job.SyncPoint.Done()
